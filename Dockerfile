@@ -1,14 +1,14 @@
 # Use minimal Alpine-based PHP image
 FROM php:8.3-alpine
 
-# Install only required extensions and dependencies
+# ติดตั้งเฉพาะเครื่องมือที่จำเป็นและเปิดใช้งาน Opcache ที่มีมาในตัว
 RUN apk add --no-cache curl \
-    && docker-php-ext-install opcache
+    && docker-php-ext-enable opcache
 
-# Install Composer
+# ติดตั้ง Composer จากอิมเมจทางการ
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Configure opcache for production
+# ตั้งค่า Opcache สำหรับโปรดักชัน
 RUN { \
     echo 'opcache.memory_consumption=64'; \
     echo 'opcache.interned_strings_buffer=8'; \
@@ -18,13 +18,11 @@ RUN { \
     echo 'opcache.enable_cli=1'; \
     } > /usr/local/etc/php/conf.d/opcache.ini
 
-# Set working directory
+# กำหนดโฟลเดอร์ทำงานหลัก
 WORKDIR /app
 
-# Copy composer.json
+# คัดลอกและติดตั้ง dependencies
 COPY composer.json ./
-
-# Install dependencies (no dev, optimized autoloader)
 RUN COMPOSER_PROCESS_TIMEOUT=600 composer install \
     --no-dev \
     --optimize-autoloader \
@@ -32,12 +30,9 @@ RUN COMPOSER_PROCESS_TIMEOUT=600 composer install \
     --no-progress \
     --prefer-dist
 
-# Copy source files
+# คัดลอกซอร์สโค้ดทั้งหมด
 COPY api/ ./api/
 COPY src/ ./src/
 
-# Expose port
-EXPOSE 8080
-
-# Use PHP built-in server (smallest footprint)
-CMD ["php", "-S", "0.0.0.0:8080", "-t", "api"]
+# ใช้ตัวแปรพอร์ตแบบไดนามิกที่ Vercel กำหนดให้ (รองรับ Fallback ไปที่ 8080 กรณีรันโลคัล)
+CMD sh -c "php -S 0.0.0.0:${PORT:-8080} -t api"
